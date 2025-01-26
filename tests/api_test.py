@@ -10,8 +10,8 @@ def test_get_interactions():
     url = f"{BASE_URL}/api/interaction/{TEST_MEDIA_ACCOUNT}"
     response = requests.get(url)
     print(f"GET {url} -> {response.status_code}")
-    if response.status_code == 200:
-        print(response.json())
+    print("response status code", response.status_code)
+    print("response: ", response.json())
 
 
 def test_get_user_interactions():
@@ -19,8 +19,8 @@ def test_get_user_interactions():
     url = f"{BASE_URL}/api/user/interactions/123456789"
     response = requests.get(url)
     print(f"GET {url} -> {response.status_code}")
-    if response.status_code == 200:
-        print(response.json())
+    print("response status code", response.status_code)
+    print("response: ", response.json())
 
 
 def test_manage_accounts():
@@ -28,7 +28,7 @@ def test_manage_accounts():
     url = f"{BASE_URL}/api/accounts"
     payload = {
         "media_account": TEST_MEDIA_ACCOUNT,  # 测试 media account
-        "start_time": "2025-01-23T00:00:00Z",
+        "start_time": "2025-01-25T00:00:00Z",
         "update_frequency": "1 week",
     }
     response = requests.post(url, json=payload)
@@ -104,9 +104,22 @@ def test_remove_task():
     print("response status code", response.status_code)
     print("response: ", response.json())
 
+TEST_USERNAME = "Sky201805"
+def test_api_person():
+    url = f"{BASE_URL}/api/person"
+    payload = {
+        "media_account": TEST_MEDIA_ACCOUNT,  # 测试 media account
+        "username": TEST_USERNAME,
+    }
+    response = requests.post(url, json=payload)
+    print("response status code", response.status_code)
+    print("response: ", response.json())
+
+
 if __name__ == "__main__":
-    # test_get_interactions()
+    test_get_interactions()
     # test_get_user_interactions()
     # test_errors()
     # test_manage_accounts()
-    test_remove_task()
+    # test_api_person()
+    # test_remove_task()
