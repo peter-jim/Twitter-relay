@@ -1,23 +1,20 @@
 import requests
+from test_utils import make_api_request
 
 # Base URL for the API
 BASE_URL = "http://127.0.0.1:5000"
 
-# API keys for testing
-# This admin key should match the one in init_admin.sql
+# API keys and secrets for testing
 ADMIN_API_KEY = "admin_5ff1c7a75e9f4e1d8f3c3c3c3c3c3c3c"
+ADMIN_API_SECRET = "admin_secret_8a4c7b3e2f1d9g6h5j8k7l4m1n3p2q9r"
 
-# This normal key should match the one in init_admin.sql
 NORMAL_API_KEY = "normal_5ff1c7a75e9f4e1d8f3c3c3c3c3c3c3c"
-
-def get_headers(api_key):
-    """Helper function to create headers with API key"""
-    return {"X-API-Key": api_key}
+NORMAL_API_SECRET = "normal_secret_9b5d8c4a3e2f1g7h6j9k8l5m2n4p3q0r"
 
 def test_list_api_keys_with_admin():
     """Test GET /admin/api-keys with admin key"""
     url = f"{BASE_URL}/admin/api-keys"
-    response = requests.get(url, headers=get_headers(ADMIN_API_KEY))
+    response = make_api_request('GET', url, ADMIN_API_KEY, ADMIN_API_SECRET)
     print(f"GET {url} -> {response.status_code}")
     print("Response:", response.json())
     assert response.status_code == 200
@@ -25,7 +22,7 @@ def test_list_api_keys_with_admin():
 def test_list_api_keys_with_normal_key():
     """Test GET /admin/api-keys with normal key (should fail)"""
     url = f"{BASE_URL}/admin/api-keys"
-    response = requests.get(url, headers=get_headers(NORMAL_API_KEY))
+    response = make_api_request('GET', url, NORMAL_API_KEY, NORMAL_API_SECRET)
     print(f"GET {url} -> {response.status_code}")
     print("Response:", response.json())
     assert response.status_code == 403
@@ -37,7 +34,7 @@ def test_create_api_key_success():
         "name": "test_key_1",
         "days_valid": 30
     }
-    response = requests.post(url, headers=get_headers(ADMIN_API_KEY), json=payload)
+    response = make_api_request('POST', url, ADMIN_API_KEY, ADMIN_API_SECRET, payload)
     print(f"POST {url} -> {response.status_code}")
     print("Response:", response.json())
     assert response.status_code == 200
@@ -49,53 +46,49 @@ def test_create_api_key_errors():
     
     # Test missing name
     payload1 = {"days_valid": 30}
-    response = requests.post(url, headers=get_headers(ADMIN_API_KEY), json=payload1)
+    response = make_api_request('POST', url, ADMIN_API_KEY, ADMIN_API_SECRET, payload1)
     print(f"POST {url} (missing name) -> {response.status_code}")
     print("Response:", response.json())
     assert response.status_code == 400
 
     # Test using normal API key
     payload2 = {"name": "test_key_2", "days_valid": 30}
-    response = requests.post(url, headers=get_headers(NORMAL_API_KEY), json=payload2)
+    response = make_api_request('POST', url, NORMAL_API_KEY, NORMAL_API_SECRET, payload2)
     print(f"POST {url} (normal key) -> {response.status_code}")
     print("Response:", response.json())
     assert response.status_code == 403
 
 def test_update_api_key():
     """Test PUT /admin/api-keys/<key_id>"""
-    # Create a new API key first
     key_id = test_create_api_key_success()
-    
     url = f"{BASE_URL}/admin/api-keys/{key_id}"
     
     # Test disabling API key
     payload = {"is_active": False}
-    response = requests.put(url, headers=get_headers(ADMIN_API_KEY), json=payload)
+    response = make_api_request('PUT', url, ADMIN_API_KEY, ADMIN_API_SECRET, payload)
     print(f"PUT {url} -> {response.status_code}")
     print("Response:", response.json())
     assert response.status_code == 200
 
     # Test using normal API key (should fail)
-    response = requests.put(url, headers=get_headers(NORMAL_API_KEY), json=payload)
+    response = make_api_request('PUT', url, NORMAL_API_KEY, NORMAL_API_SECRET, payload)
     print(f"PUT {url} (normal key) -> {response.status_code}")
     print("Response:", response.json())
     assert response.status_code == 403
 
 def test_delete_api_key():
     """Test DELETE /admin/api-keys/<key_id>"""
-    # Create a new API key first
     key_id = test_create_api_key_success()
-    
     url = f"{BASE_URL}/admin/api-keys/{key_id}"
     
     # Test using normal API key (should fail)
-    response = requests.delete(url, headers=get_headers(NORMAL_API_KEY))
+    response = make_api_request('DELETE', url, NORMAL_API_KEY, NORMAL_API_SECRET)
     print(f"DELETE {url} (normal key) -> {response.status_code}")
     print("Response:", response.json())
     assert response.status_code == 403
 
     # Test using admin API key
-    response = requests.delete(url, headers=get_headers(ADMIN_API_KEY))
+    response = make_api_request('DELETE', url, ADMIN_API_KEY, ADMIN_API_SECRET)
     print(f"DELETE {url} -> {response.status_code}")
     print("Response:", response.json())
     assert response.status_code == 200
@@ -111,7 +104,7 @@ def test_without_api_key():
     
     for method, path in endpoints:
         url = f"{BASE_URL}{path}"
-        response = requests.request(method, url)
+        response = requests.request(method, url)  # no api key
         print(f"{method} {url} (no key) -> {response.status_code}")
         print("Response:", response.json())
         assert response.status_code == 401

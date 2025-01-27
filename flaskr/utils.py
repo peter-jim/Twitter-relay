@@ -57,14 +57,35 @@ def require_api_key(f=None, *, admin_required=False):
         
     @wraps(f)
     def wrapper(*args, **kwargs):
+        # get api key, signature, timestamp
         api_key = request.headers.get('X-API-Key')
-        if not api_key:
+        signature = request.headers.get('X-Signature')
+        timestamp = request.headers.get('X-Timestamp')
+        
+        if not api_key or not signature or not timestamp:
             return {
                 "status": "error",
-                "message": "Missing API key"
+                "message": "Missing API key, signature or timestamp"
             }, 401
             
         try:
+            # check timestamp
+            try:
+                req_time = int(timestamp)
+                current_time = int(datetime.now(timezone.utc).timestamp())
+                # allow 5 minutes time difference
+                if abs(current_time - req_time) > 300:
+                    return {
+                        "status": "error",
+                        "message": "Request expired"
+                    }, 401
+            except ValueError:
+                return {
+                    "status": "error",
+                    "message": "Invalid timestamp"
+                }, 401
+            
+            # get api key record
             key = db.session.execute(
                 select(ApiKey).where(ApiKey.api_key == api_key)
             ).scalar_one()
@@ -73,6 +94,18 @@ def require_api_key(f=None, *, admin_required=False):
                 return {
                     "status": "error",
                     "message": "Invalid or expired API key"
+                }, 401
+            
+            # construct message for hmac verification
+            message = f"{request.method}{request.path}{timestamp}"
+            if request.data:
+                message += request.data.decode('utf-8')
+            
+            # check hmac signature
+            if not key.verify_hmac(signature, message):
+                return {
+                    "status": "error",
+                    "message": "Invalid signature"
                 }, 401
             
             if admin_required and not key.is_admin:

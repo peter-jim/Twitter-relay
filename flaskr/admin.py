@@ -37,14 +37,18 @@ def create_api_key():
     if not name:
         return response_bad_request("Name is required")
     
-    api_key = ApiKey(
-        api_key=ApiKey.generate_key(),
+    # generate api key and secret
+    api_key, api_secret = ApiKey.generate_credentials()
+    
+    api_key_obj = ApiKey(
+        api_key=api_key,
+        api_secret=api_secret,
         api_name=name,
         expires_at=datetime.now(timezone.utc) + timedelta(days=days_valid) if days_valid else None
     )
     
     try:
-        db.session.add(api_key)
+        db.session.add(api_key_obj)
         db.session.commit()
     except Exception as e:
         db.session.rollback()
@@ -55,10 +59,11 @@ def create_api_key():
         "status": "success",
         "message": "API key created successfully",
         "api_key": {
-            "id": api_key.id,
-            "api_key": api_key.api_key,  # Only show key upon creation
-            "api_name": api_key.api_name,
-            "expires_at": api_key.expires_at.isoformat() if api_key.expires_at else None
+            "id": api_key_obj.id,
+            "api_key": api_key_obj.api_key,
+            "api_secret": api_key_obj.api_secret,
+            "api_name": api_key_obj.api_name,
+            "expires_at": api_key_obj.expires_at.isoformat() if api_key_obj.expires_at else None
         }
     }
 

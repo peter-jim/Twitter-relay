@@ -21,6 +21,7 @@ CREATE TABLE x_interactions
 CREATE TABLE api_keys (
     id              INT AUTO_INCREMENT PRIMARY KEY,
     api_key         VARCHAR(64) UNIQUE NOT NULL,
+    api_secret      VARCHAR(64) NOT NULL,
     api_name        VARCHAR(128) NOT NULL,
     is_admin        BOOLEAN NOT NULL DEFAULT FALSE,
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
@@ -33,33 +34,37 @@ CREATE TABLE api_keys (
 -- Insert the test admin API key
 INSERT INTO api_keys (
     api_key,
+    api_secret,
     api_name,
-    is_active,
     is_admin,
+    is_active,
     created_at,
     expires_at
 ) VALUES (
-    'admin_5ff1c7a75e9f4e1d8f3c3c3c3c3c3c3c',  -- A fixed admin API key for testing
+    'admin_5ff1c7a75e9f4e1d8f3c3c3c3c3c3c3c',  -- 测试用的固定admin API key
+    'admin_secret_8a4c7b3e2f1d9g6h5j8k7l4m1n3p2q9r',  -- 测试用的固定admin API secret
     'admin',
     TRUE,
     TRUE,
     CURRENT_TIMESTAMP,
-    NULL  -- Never expires
+    NULL  -- 永不过期
 );
 
 -- Insert the test normal API key
 INSERT INTO api_keys (
     api_key,
+    api_secret,
     api_name,
-    is_active,
     is_admin,
+    is_active,
     created_at,
     expires_at
 ) VALUES (
-    'normal_5ff1c7a75e9f4e1d8f3c3c3c3c3c3c3c',  -- A fixed normal API key for testing
+    'normal_5ff1c7a75e9f4e1d8f3c3c3c3c3c3c3c',  -- 测试用的固定normal API key
+    'normal_secret_9b5d8c4a3e2f1g7h6j9k8l5m2n4p3q0r',  -- 测试用的固定normal API secret
     'normal',
-    TRUE,
     FALSE,
+    TRUE,
     CURRENT_TIMESTAMP,
-    NULL  -- Never expires
+    NULL  -- 永不过期
 );
