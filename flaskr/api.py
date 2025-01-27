@@ -8,7 +8,7 @@ from .extensions import db
 from sqlalchemy.sql.expression import select
 from .models import Interaction
 from .services.scheduler import add_xsync_once_task, add_xsync_task, remove_xsync_task, DataCollector
-from .utils import validate_update_frequency, response_media_not_found, response_internal_server_error, \
+from .utils import require_api_key, validate_update_frequency, response_media_not_found, response_internal_server_error, \
     response_bad_request
 
 bp = Blueprint('api', __name__, url_prefix="/api")
@@ -17,15 +17,52 @@ bp = Blueprint('api', __name__, url_prefix="/api")
 @bp.route("/interaction/<media_account>", methods=['GET'])
 def get_interactions(media_account: str):
     try:
+         # Get pagination parameters from request args
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        
+        # Validate pagination parameters
+        if page < 1:
+            return response_bad_request("Page number must be greater than 0")
+        if per_page < 1 or per_page > 100:
+            return response_bad_request("Items per page must be between 1 and 100")
+
+
         result = db.session.execute(
-            select(Interaction).where(Interaction.media_account == media_account)
+            select(Interaction)
+            .where(Interaction.media_account == media_account)
+            .order_by(Interaction.interaction_time.desc())
+            .offset((page - 1) * per_page)
+            .limit(per_page)
         )
+
+        # Get total count for pagination info
+        total_count = db.session.execute(
+            select(func.count())
+            .select_from(Interaction)
+            .where(Interaction.media_account == media_account)
+        ).scalar()
+
+        # Calculate pagination metadata
+        total_pages = (total_count + per_page - 1) // per_page
+        has_next = page < total_pages
+        has_prev = page > 1
+
         interactions = result.scalars().all()
-    except Exception:
+    except Exception as e:
+        current_app.logger.error(f"Failed to get interactions: {str(e)}")
         return response_internal_server_error()
 
     return {
         "media_account": media_account,
+        "pagination": {
+            "current_page": page,
+            "per_page": per_page,
+            "total_items": total_count,
+            "total_pages": total_pages,
+            "has_next": has_next,
+            "has_prev": has_prev
+        },
         "interactions": [
             {
                 "interaction_id": interaction.interaction_id,
@@ -34,7 +71,7 @@ def get_interactions(media_account: str):
                 "avatar_url": interaction.avatar_url,
                 "interaction_type": interaction.interaction_type,
                 "interaction_content": interaction.interaction_content,
-                "interaction_time": interaction.interaction_time.isoformat(),  # 转换为 ISO 格式
+                "interaction_time": interaction.interaction_time.isoformat(),  # Convert to ISO format
                 "post_id": interaction.post_id,
                 "post_time": interaction.post_time.isoformat(),
             }
@@ -49,10 +86,10 @@ def get_interaction_count(user_id: str):
         result = db.session.execute(
             select(
                 Interaction.interaction_type,
-                func.count().label('count')  # 聚合计数
+                func.count().label('count')  # Aggregate count
             )
-            .where(Interaction.user_id == user_id)  # 根据用户ID过滤
-            .group_by(Interaction.interaction_type)  # 按互动类型分组
+            .where(Interaction.user_id == user_id)  # Filter by user ID
+            .group_by(Interaction.interaction_type)  # Group by interaction type
         )
 
         interaction_summary = {
@@ -72,7 +109,8 @@ def get_interaction_count(user_id: str):
                 interaction_summary["retweet"] = count
 
         total_interactions = sum(interaction_summary.values())
-    except Exception:
+    except Exception as e:
+        current_app.logger.error(f"Failed to get interaction count: {str(e)}")
         return response_internal_server_error()
 
     return {
@@ -83,6 +121,7 @@ def get_interaction_count(user_id: str):
 
 
 @bp.route("/accounts", methods=["POST", "PUT", "DELETE"])
+@require_api_key
 def manage_accounts():
     req = request.json
     media_account = req["media_account"]
@@ -100,9 +139,12 @@ def manage_accounts():
 
     start_time = req["start_time"]
     update_frequency = req["update_frequency"]
-    # 校验 start_time 和 update_frequency
+    # Validate start_time and update_frequency
     try:
-        start_dt = datetime.fromisoformat(start_time)
+        start_dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+        # Ensure it's UTC
+        if start_dt.tzinfo != timezone.utc:
+            start_dt = start_dt.replace(tzinfo=timezone.utc)
     except ValueError as e:
         current_app.logger.error(f"Invalid start time: {start_time}: {str(e)}")
         return response_bad_request("Invalid start time format, require ISO 8601 format")
@@ -118,14 +160,14 @@ def manage_accounts():
         return response_bad_request(str(e))
 
     if request.method in ["POST", "PUT"]:
-        # 之后使用定时任务按照update_frequency周期进行采集，定时任务先开起来，初始化采集会很耗时
         try:
+            # Validate media account before adding tasks
+            dc = DataCollector.default(media_account)
+            # Try to get some data to verify the account exists and is accessible
+            dc.validate_media_account()
+
             add_xsync_task(media_account, frequency_unit, frequency_value)
-
-            # 添加一次性的初始化任务，立即执行
-            add_xsync_once_task(media_account, start_dt)
-
-            # fetch_and_store_xdata(media_account, start_dt)
+            add_xsync_once_task(media_account, start_dt)  # Add a one-time initialization task to execute immediately
         except Exception as e:
             return response_media_not_found(str(e))
         return {
@@ -135,7 +177,8 @@ def manage_accounts():
 
 
 @bp.route("/person", methods=["POST"])
-def get_interactions_by_user():
+@require_api_key
+def manage_person():
     req = request.json
     media_account = req["media_account"]
     username = req["username"]
@@ -160,7 +203,7 @@ def get_interactions_by_user():
             new_interaction = result.scalar()
 
             if new_interaction:
-                merged_interactions.append(new_interaction)  # 使用 to_dict 方法格式化时间
+                merged_interactions.append(new_interaction)  # Use to_dict method to format time
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"Failed to add interaction: {str(e)}")
@@ -176,7 +219,7 @@ def get_interactions_by_user():
                 "avatar_url": interaction.avatar_url,
                 "interaction_type": interaction.interaction_type,
                 "interaction_content": interaction.interaction_content,
-                "interaction_time": interaction.interaction_time.isoformat(),  # 转换为 ISO 格式
+                "interaction_time": interaction.interaction_time.isoformat(),  # Convert to ISO format
                 "post_id": interaction.post_id,
                 "post_time": interaction.post_time.isoformat(),
             }

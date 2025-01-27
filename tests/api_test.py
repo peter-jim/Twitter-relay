@@ -2,124 +2,191 @@ import requests
 
 # Base URL for the API
 BASE_URL = "http://127.0.0.1:5000"
+
+# Test accounts
 TEST_MEDIA_ACCOUNT = "hetu_protocol"
+TEST_USERNAME = "Sky201805"
+TEST_USER_ID = 993673319512653824
 
+# API key for testing (should match the one in init_admin.sql)
+API_KEY = "normal_5ff1c7a75e9f4e1d8f3c3c3c3c3c3c3c"
 
+def get_headers(api_key=None):
+    """Helper function to create headers with optional API key"""
+    return {"X-API-Key": api_key} if api_key else {}
+
+# Tests that don't require API key
 def test_get_interactions():
     """Test the GET /api/interaction/<media_account> endpoint"""
     url = f"{BASE_URL}/api/interaction/{TEST_MEDIA_ACCOUNT}"
     response = requests.get(url)
     print(f"GET {url} -> {response.status_code}")
-    print("response status code", response.status_code)
-    print("response: ", response.json())
-
+    print("Response:", response.json())
+    assert response.status_code == 200
 
 def test_get_user_interactions():
     """Test the GET /api/user/interactions/<user_id> endpoint"""
-    url = f"{BASE_URL}/api/user/interactions/123456789"
+    url = f"{BASE_URL}/api/user/interactions/{TEST_USER_ID}"
     response = requests.get(url)
     print(f"GET {url} -> {response.status_code}")
-    print("response status code", response.status_code)
-    print("response: ", response.json())
+    print("Response:", response.json())
+    assert response.status_code == 200
 
-
+# Tests that require API key
 def test_manage_accounts():
     """Test the POST /api/accounts endpoint"""
     url = f"{BASE_URL}/api/accounts"
     payload = {
-        "media_account": TEST_MEDIA_ACCOUNT,  # 测试 media account
+        "media_account": TEST_MEDIA_ACCOUNT,  # Test media account
         "start_time": "2025-01-25T00:00:00Z",
         "update_frequency": "1 week",
     }
-    response = requests.post(url, json=payload)
+    response = requests.post(url, headers=get_headers(API_KEY), json=payload)
     print(f"POST {url} -> {response.status_code}")
-    print("response status code", response.status_code)
-    print("response: ", response.json())
+    print("Response:", response.json())
+    assert response.status_code == 200
 
-
-def test_manage_accounts_errors1():
+def test_manage_accounts_errors():
+    """Test various error cases for the POST /api/accounts endpoint"""
     url = f"{BASE_URL}/api/accounts"
-    payload = {
-        "media_account": "你好大大打算",  # 测试 错误的media account
+    
+    # Test case 1: Invalid media account
+    payload1 = {
+        "media_account": "你好打算大大",
         "start_time": "2025-01-20T00:00:00Z",
         "update_frequency": "5 minutes",
     }
-    response = requests.post(url, json=payload)
-    print(f"POST {url} -> {response.status_code}")
-    print("response status code", response.status_code)
-    print("response: ", response.json())
+    response = requests.post(url, headers=get_headers(API_KEY), json=payload1)
+    print(f"POST {url} (invalid account) -> {response.status_code}")
+    print("Response:", response.json())
+    assert response.status_code == 400
 
-def test_manage_accounts_errors2():
-    url = f"{BASE_URL}/api/accounts"
-    payload = {
-        "media_account": TEST_MEDIA_ACCOUNT,  # 测试 media account
-        "start_time": "2026-01-20T00:00:00Z",  # 26年
+    # Test case 2: Future date too far
+    payload2 = {
+        "media_account": TEST_MEDIA_ACCOUNT,
+        "start_time": "2026-01-20T00:00:00Z",
         "update_frequency": "5 minutes",
     }
-    response = requests.post(url, json=payload)
-    print(f"POST {url} -> {response.status_code}")
-    print("response status code", response.status_code)
-    print("response: ", response.json())
+    response = requests.post(url, headers=get_headers(API_KEY), json=payload2)
+    print(f"POST {url} (future date) -> {response.status_code}")
+    print("Response:", response.json())
+    assert response.status_code == 400
 
-def test_manage_accounts_errors3():
-    url = f"{BASE_URL}/api/accounts"
-    payload = {
-        "media_account": TEST_MEDIA_ACCOUNT,  # 测试 media account
-        "start_time": "2026-01-20 00:00:00 ",  # 格式不对
+    # Test case 3: Invalid datetime format
+    payload3 = {
+        "media_account": TEST_MEDIA_ACCOUNT,
+        "start_time": "2026-01-20 00:00:00",
         "update_frequency": "5 minutes",
     }
-    response = requests.post(url, json=payload)
-    print(f"POST {url} -> {response.status_code}")
-    print("response status code", response.status_code)
-    print("response: ", response.json())
+    response = requests.post(url, headers=get_headers(API_KEY), json=payload3)
+    print(f"POST {url} (invalid format) -> {response.status_code}")
+    print("Response:", response.json())
+    assert response.status_code == 400
 
-
-def test_manage_accounts_errors4():
-    url = f"{BASE_URL}/api/accounts"
-    payload = {
-        "media_account": TEST_MEDIA_ACCOUNT,  # 测试 media account
-        "start_time": "2026-01-20 00:00:00 ",
-        "update_frequency": "5 years",  # 没有years
+    # Test case 4: Invalid update frequency
+    payload4 = {
+        "media_account": TEST_MEDIA_ACCOUNT,
+        "start_time": "2025-01-20T00:00:00Z",
+        "update_frequency": "5 years",
     }
-    response = requests.post(url, json=payload)
-    print(f"POST {url} -> {response.status_code}")
-    print("response status code", response.status_code)
-    print("response: ", response.json())
-
-def test_errors():
-    test_manage_accounts_errors1()
-    test_manage_accounts_errors2()
-    test_manage_accounts_errors3()
-    test_manage_accounts_errors4()
-
+    response = requests.post(url, headers=get_headers(API_KEY), json=payload4)
+    print(f"POST {url} (invalid frequency) -> {response.status_code}")
+    print("Response:", response.json())
+    assert response.status_code == 400
 
 def test_remove_task():
+    """Test the DELETE /api/accounts endpoint"""
     url = f"{BASE_URL}/api/accounts"
     payload = {
-        "media_account": TEST_MEDIA_ACCOUNT,  # 测试 media account
-        "start_time": "2026-01-20 00:00:00 ",  # 格式不对
+        "media_account": TEST_MEDIA_ACCOUNT,
+        "start_time": "2025-01-20T00:00:00Z",
         "update_frequency": "5 minutes",
     }
-    response = requests.delete(url, json=payload)
-    print("response status code", response.status_code)
-    print("response: ", response.json())
+    response = requests.delete(url, headers=get_headers(API_KEY), json=payload)
+    print(f"DELETE {url} -> {response.status_code}")
+    print("Response:", response.json())
+    assert response.status_code == 200
 
-TEST_USERNAME = "Sky201805"
 def test_api_person():
+    """Test the POST /api/person endpoint"""
     url = f"{BASE_URL}/api/person"
     payload = {
-        "media_account": TEST_MEDIA_ACCOUNT,  # 测试 media account
+        "media_account": TEST_MEDIA_ACCOUNT,
         "username": TEST_USERNAME,
     }
-    response = requests.post(url, json=payload)
-    print("response status code", response.status_code)
-    print("response: ", response.json())
+    response = requests.post(url, headers=get_headers(API_KEY), json=payload)
+    print(f"POST {url} -> {response.status_code}")
+    print("Response:", response.json())
+    assert response.status_code == 200
 
+def test_without_required_api_key():
+    """Test endpoints that require API key without providing one"""
+    endpoints = [
+        ("POST", "/api/accounts"),
+        ("DELETE", "/api/accounts"),
+        ("POST", "/api/person")
+    ]
+    
+    for method, path in endpoints:
+        url = f"{BASE_URL}{path}"
+        response = requests.request(method, url)
+        print(f"{method} {url} (no key) -> {response.status_code}")
+        print("Response:", response.json())
+        assert response.status_code == 401
+
+
+def test_with_invalid_api_key():
+    """Test endpoints with an invalid API key"""
+    invalid_key = "invalid_key_12345"
+    
+    # Test endpoints that require API key
+    endpoints = [
+        ("POST", "/api/accounts", {
+            "media_account": TEST_MEDIA_ACCOUNT,
+            "start_time": "2025-01-25T00:00:00Z",
+            "update_frequency": "1 week"
+        }),
+        ("DELETE", "/api/accounts", {
+            "media_account": TEST_MEDIA_ACCOUNT,
+            "start_time": "2025-01-20T00:00:00Z",
+            "update_frequency": "5 minutes"
+        }),
+        ("POST", "/api/person", {
+            "media_account": TEST_MEDIA_ACCOUNT,
+            "username": TEST_USERNAME
+        })
+    ]
+    
+    for method, path, payload in endpoints:
+        url = f"{BASE_URL}{path}"
+        response = requests.request(
+            method, 
+            url, 
+            headers=get_headers(invalid_key),
+            json=payload
+        )
+        print(f"{method} {url} (invalid key) -> {response.status_code}")
+        print("Response:", response.json())
+        assert response.status_code == 401
+        assert response.json()["message"] == "Invalid API key"
 
 if __name__ == "__main__":
-    test_get_interactions()
+    # Run tests that don't require API key
+    # print("\n=== Running tests without API key ===")
+    # test_get_interactions()
     # test_get_user_interactions()
-    # test_errors()
+    
+    # Run tests that require API key
+    # print("\n=== Running tests with API key ===")
     # test_manage_accounts()
+    # test_manage_accounts_errors()
     # test_api_person()
     # test_remove_task()
+    
+    # Run tests for missing API key
+    # print("\n=== Running tests for missing API key ===")
+    # test_without_required_api_key()
+
+    # Run tests for invalid API key
+    print("\n=== Running tests with invalid API key ===")
+    test_with_invalid_api_key()

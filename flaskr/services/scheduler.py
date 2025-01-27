@@ -30,7 +30,7 @@ class DataCollector:
         self.interactions = []
         self.start_time = from_date
         self.end_time = datetime.now(tz=timezone.utc)
-        # 检查是否是utc时间
+        # Check if it's utc time
         if from_date:
             if not isinstance(from_date, datetime):
                 raise TypeError('from_date must be of type datetime')
@@ -48,6 +48,14 @@ class DataCollector:
             media_account=media_account,
         )
 
+    def validate_media_account(self):
+        try:
+            # Try to get minimal data to verify account
+            # Implementation depends on your specific needs
+            self.client.get_user(username=self.media_account)
+        except Exception:
+            raise ValueError("Media account not found")
+
     def get_user_id(self):
         try:
             resp = self.client.get_user(username=self.media_account)
@@ -56,7 +64,7 @@ class DataCollector:
             return resp["data"]["id"]
         except tweepy.errors.TweepyException as e:
             logger.warning(f'failed to get user id by media account: {e}')
-            remove_xsync_task(self.media_account)  # 加错了就删
+            remove_xsync_task(self.media_account)  # If it's wrong, delete it
             raise ValueError("Media account not found")
 
     def get_tweets(self, uid: int):
@@ -65,7 +73,7 @@ class DataCollector:
         for resp in tweepy.Paginator(
                 self.client.get_users_tweets,
                 max_results=DataCollector.MAX_RESULTS,
-                exclude=["replies"],  # 排除 replies
+                exclude=["replies"],  # Exclude replies
                 id=uid,
                 start_time=self.start_time_as_param,
                 tweet_fields=['created_at', 'conversation_id']
@@ -94,7 +102,7 @@ class DataCollector:
         return tweets
 
     def get_like_interactions(self, tweet):
-        # 获取不到点赞行为的时间点
+        # Can't get the time point of likes
         likes_interactions = []
         tweet_id = tweet["tweet_id"]
         tweet_at = tweet["created_at"]
@@ -115,7 +123,7 @@ class DataCollector:
                         "avatar_url": data.profile_image_url,
                         "interaction_type": "likes",
                         "interaction_content": "",
-                        "interaction_time": tweet_at,  # likes 没有创建时间
+                        "interaction_time": tweet_at, 
                         "post_id": tweet_id,
                         "post_time": tweet_at,
                     })
@@ -126,7 +134,7 @@ class DataCollector:
                     #     "avatar_url": data.profile_image_url,
                     #     "interaction_type": "likes",
                     #     "interaction_content": "",
-                    #     "interaction_time": tweet_at,  # likes 没有创建时间
+                    #     "interaction_time": tweet_at,  
                     #     "post_id": tweet_id,
                     #     "post_time": tweet_at,
                     # })
@@ -139,7 +147,7 @@ class DataCollector:
         tweet_id = tweet["tweet_id"]
         tweet_at = tweet["created_at"]
 
-        # 包含replies和retweets
+        # Contains replies and retweets
         quote_interactions = []
         for resp in tweepy.Paginator(
                 self.client.get_quote_tweets,
@@ -169,7 +177,7 @@ class DataCollector:
                     "interaction_id": data["id"],
                     "interaction_type": "quote",
                     "interaction_content": data["text"],
-                    "interaction_time": datetime_as_db_format(data["created_at"]),  # likes 没有创建时间
+                    "interaction_time": datetime_as_db_format(data["created_at"]),
                     "post_id": tweet_id,
                     "post_time": tweet_at,
                 }
@@ -207,7 +215,7 @@ class DataCollector:
                 )
                 break
 
-            # 分页查询
+            # Paginated query
             meta = resp_data["meta"]
             if meta["result_count"] == 0:
                 break
@@ -221,8 +229,8 @@ class DataCollector:
                     # "avatar_url": data["profile_image_url"],
                     "interaction_id": data["id"],
                     "interaction_type": "retweet",
-                    "interaction_content": data["text"],  # retweet 没有任何回复
-                    "interaction_time": datetime_as_db_format(data["created_at"]),  # likes 没有创建时间
+                    "interaction_content": data["text"], 
+                    "interaction_time": datetime_as_db_format(data["created_at"]),
                     "post_id": tweet_id,
                     "post_time": tweet_at,
                 }
@@ -407,10 +415,10 @@ class DataCollector:
             return method(*args)
         except tweepy.errors.TooManyRequests:
             logger.warning(f"Rate limit exceeded for {method.__name__}. Skipping this interaction type.")
-            return []  # 返回空列表，表示跳过该类型数据
+            return []  # Return an empty list, indicating to skip this type of data
         except tweepy.errors.TweepyException as e:
             logger.error(f"Error in {method.__name__}: {str(e)}")
-            return []  # 返回空列表，表示跳过该类型数据
+            return []  # Return an empty list, indicating to skip this type of data
 
 
 RAW_SECRET = os.getenv("NOSTR_SECRET")
@@ -433,12 +441,12 @@ class NostrPublisher:
         )
         current_app.logger.info("Added relay to manager")
 
-        # 添加订阅，只监听从现在开始的新消息
+        # Add subscription, only listen to new messages starting from now
         current_time = int(datetime.now(timezone.utc).timestamp())
         filters = FiltersList([
             Filters(
                 authors=[self.private_key.public_key.hex()],
-                since=current_time  # 只接收从现在开始的新消息
+                since=current_time  # Only receive new messages starting from now
             )
         ])
         subscription_id = uuid.uuid1().hex
@@ -508,7 +516,7 @@ class NostrPublisher:
 
             self.relay_manager.publish_event(event)
             self.relay_manager.run_sync()
-            # 等待并检查消息池中的响应
+            # Wait and check the response in the message pool
             start_time = time.time()
             while time.time() - start_time < timeout:
                 if self.relay_manager.message_pool.has_ok_notices():
@@ -579,34 +587,8 @@ def fetch_and_store_xdata(media_account, from_dt: datetime):
     current_app.logger.info("Completed fetching and processing data")
 
 
-# def fetch_and_store_xdata(media_account, from_dt: datetime):
-#     current_app.logger.info(
-#         f"start fetching xdata from {from_dt} to {datetime.now(tz=timezone.utc)} for {media_account}")
-#     client = tweepy.Client(BEARER_TOKEN, API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_SECRET, return_type=dict)
-#
-#     dc = DataCollector(client, media_account, from_dt)
-#     interactions_data = dc.get_interactions()
-#     interactions = [
-#         Interaction(**interaction_data)
-#         for interaction_data in interactions_data
-#     ]
-#     try:
-#         db.session.add_all(interactions)
-#         db.session.commit()
-#     except IntegrityError:
-#         db.session.rollback()
-#         for interaction in interactions:
-#             try:
-#                 db.session.add(interaction)
-#                 db.session.commit()
-#             except IntegrityError:
-#                 db.session.rollback()
-#                 # current_app.logger.error(f"duplicate interaction, {interaction.interaction_id}")
-#     current_app.logger.info("success to fetch data")
-
-
 def fetch_and_store_xdata_with_context(media_account, from_dt: datetime):
-    with scheduler.app.app_context():  # 手动创建上下文
+    with scheduler.app.app_context():  # Manually create context
         fetch_and_store_xdata(media_account, from_dt)
 
 
@@ -630,14 +612,14 @@ def add_xsync_task(media_account: str, frequency_unit: str, frequency_value: int
     else:
         raise ValueError(f"Unsupported frequency unit: {frequency_unit}")
 
-    # 添加定时任务，按间隔执行任务
+    # Add a scheduled task to execute at intervals
     scheduler.add_job(
-        func=fetch_and_store_xdata_with_context,  # 需要执行的函数
-        trigger=IntervalTrigger(**interval_params),  # 设置间隔触发器
-        next_run_time=next_run_time,  # 首次执行时间
-        id=f"task_{media_account}",  # 设置任务的唯一 ID
-        args=[media_account, now],  # 传递参数给 fetch_xdata 函数
-        replace_existing=True,  # 如果任务 ID 已经存在，替换它
+        func=fetch_and_store_xdata_with_context,  # Function to execute
+        trigger=IntervalTrigger(**interval_params),  # Set interval trigger
+        next_run_time=next_run_time,  # First execution time
+        id=f"task_{media_account}",  # Set task's unique ID
+        args=[media_account, now],  # Pass parameters to fetch_xdata function
+        replace_existing=True,  # If the task ID already exists, replace it
         misfire_grace_time=None
     )
 
@@ -645,8 +627,8 @@ def add_xsync_task(media_account: str, frequency_unit: str, frequency_value: int
 def add_xsync_once_task(media_account: str, from_dt: datetime):
     scheduler.add_job(
         func=fetch_and_store_xdata_with_context,
-        trigger='date',  # 使用date触发器实现一次性任务
-        next_run_time=datetime.now(tz=timezone.utc),  # 立即执行
+        trigger='date',  # Use date trigger to implement a one-time task
+        next_run_time=datetime.now(tz=timezone.utc),  # Execute immediately
         id=f"init_task_{media_account}",
         args=[media_account, from_dt],
         replace_existing=True,
