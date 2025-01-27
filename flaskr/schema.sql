@@ -18,7 +18,7 @@ CREATE TABLE x_interactions
 );
 
 -- Create api_keys table
-CREATE TABLE api_keys (
+CREATE TABLE x_api_keys (
     id              INT AUTO_INCREMENT PRIMARY KEY,
     api_key         VARCHAR(64) UNIQUE NOT NULL,
     api_secret      VARCHAR(64) NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE api_keys (
 );
 
 -- Insert the test admin API key
-INSERT INTO api_keys (
+INSERT INTO x_api_keys (
     api_key,
     api_secret,
     api_name,
@@ -51,7 +51,7 @@ INSERT INTO api_keys (
 );
 
 -- Insert the test normal API key
-INSERT INTO api_keys (
+INSERT INTO x_api_keys (
     api_key,
     api_secret,
     api_name,

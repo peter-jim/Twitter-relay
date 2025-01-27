@@ -25,7 +25,7 @@ class Interaction(db.Model):
 
 
 class ApiKey(db.Model):
-    __tablename__ = 'api_keys'
+    __tablename__ = 'x_api_keys'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     api_key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
