@@ -70,11 +70,11 @@ python run.py
 项目包含完整的测试用例，可以通过运行以下命令执行测试：
 
 ```bash
-python -m tests.api_test
+python tests/api_test.py
 ```
 以及
 ```bash
-python -m tests.admin_test
+python tests/admin_test.py
 ```
 
 ## 注意事项

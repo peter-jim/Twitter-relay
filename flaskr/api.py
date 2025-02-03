@@ -1,9 +1,6 @@
 from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
-
-import tweepy
 from flask import request, Blueprint, current_app
-from sqlalchemy import func
+from sqlalchemy import  func
 from .extensions import db
 from sqlalchemy.sql.expression import select
 from .models import Interaction
@@ -17,31 +14,41 @@ bp = Blueprint('api', __name__, url_prefix="/api")
 @bp.route("/interaction/<media_account>", methods=['GET'])
 def get_interactions(media_account: str):
     try:
-         # Get pagination parameters from request args
+         # Get pagination parameters and username from request args
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
-        
+        username =  request.args.get('username', None)
+
         # Validate pagination parameters
         if page < 1:
             return response_bad_request("Page number must be greater than 0")
         if per_page < 1 or per_page > 100:
             return response_bad_request("Items per page must be between 1 and 100")
 
+        # basic query
+        query = select(Interaction).where(Interaction.media_account == media_account)
+
+        if username:
+            query = query.where(Interaction.username == username)
+
 
         result = db.session.execute(
-            select(Interaction)
-            .where(Interaction.media_account == media_account)
+            query
             .order_by(Interaction.interaction_time.desc())
             .offset((page - 1) * per_page)
             .limit(per_page)
         )
 
+        # total count basic query
+        count_query = select(func.count()).select_from(Interaction).where(Interaction.media_account == media_account)
+        if username:
+            count_query = count_query.where(Interaction.username == username)
+
         # Get total count for pagination info
-        total_count = db.session.execute(
-            select(func.count())
-            .select_from(Interaction)
-            .where(Interaction.media_account == media_account)
-        ).scalar()
+        total_count = db.session.execute(count_query).scalar()
+        if not total_count:
+            current_app.logger.warning("unexpected! total count cannot be None.")
+            total_count = 0
 
         # Calculate pagination metadata
         total_pages = (total_count + per_page - 1) // per_page
@@ -55,6 +62,7 @@ def get_interactions(media_account: str):
 
     return {
         "media_account": media_account,
+        "username": username,
         "pagination": {
             "current_page": page,
             "per_page": per_page,
