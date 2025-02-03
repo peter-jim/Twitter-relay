@@ -45,28 +45,36 @@ API_SECRET=example
 ACCESS_TOKEN=example
 ACCESS_SECRET=example
 BEARER_TOKEN=example
-DATABASE_URL=example
+DATABASE_URL=mysql+pymysql://useranme:password@addr/dbname
+NOSTR_SECRET=nsecxxxxexample
 ```
 
 3. 初始化数据库：
 
-参考 `./flaskr/schema.sql`
+执行 `./flaskr/schema.sql` 中所有sql语句进行table初始化以及api key初始化。
 
 ## API 接口定义
 
 参考 `https://kxx0hmk42lx.feishu.cn/docx/JO9Rd2g58oTCr5xeNSicCOPnnNh`
 
 ## 运行项目
-
+进入项目根目录执行：
 ```bash
 python run.py
 ```
 
 ## 测试
 
+可以查看`test_utils.py`中的构建请求的函数。
+
 项目包含完整的测试用例，可以通过运行以下命令执行测试：
+
 ```bash
 python -m tests.api_test
+```
+以及
+```bash
+python -m tests.admin_test
 ```
 
 ## 注意事项

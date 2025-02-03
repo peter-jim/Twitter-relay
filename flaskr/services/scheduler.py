@@ -421,7 +421,7 @@ class DataCollector:
             return []  # Return an empty list, indicating to skip this type of data
 
 
-RAW_SECRET = os.getenv("NOSTR_SECRET")
+NOSTR_SECRET = os.getenv("NOSTR_SECRET")
 
 from pynostr.relay_manager import RelayManager
 from pynostr.key import PrivateKey
@@ -433,7 +433,7 @@ from flask import current_app
 class NostrPublisher:
     def __init__(self):
         self.relay_manager = RelayManager(timeout=6)
-        self.private_key = PrivateKey.from_nsec(RAW_SECRET)
+        self.private_key = PrivateKey.from_nsec(NOSTR_SECRET)
 
         self.relay_manager.add_relay(
             "ws://144.126.138.135:10548",
