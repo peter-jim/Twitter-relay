@@ -6,6 +6,7 @@ from flaskr import db
 import hmac
 import hashlib
 
+
 class Interaction(db.Model):
     __tablename__ = 'x_interactions'  # Define table name
 
@@ -15,13 +16,15 @@ class Interaction(db.Model):
     username: Mapped[str] = mapped_column(String(255), nullable=False)  # Username
     avatar_url: Mapped[str] = mapped_column(String(255), nullable=True)  # Avatar URL
     interaction_type: Mapped[str] = mapped_column(String(20), nullable=False)  # Interaction type
-    interaction_content: Mapped[str] = mapped_column(Text, nullable=True)  # Interaction content (optional, for comments)
+    interaction_content: Mapped[str] = mapped_column(Text,
+                                                     nullable=True)  # Interaction content (optional, for comments)
     interaction_time: Mapped[datetime] = mapped_column(TIMESTAMP, nullable=False)  # Interaction time
-    post_id: Mapped[str] = mapped_column(String(64), nullable=False)  # Post ID, for association
-    post_time: Mapped[datetime] = mapped_column(TIMESTAMP, nullable=False)  # Post publish time
+    post_id: Mapped[str] = mapped_column(String(64), nullable=True)  # Post ID, for association
+    post_time: Mapped[datetime] = mapped_column(TIMESTAMP, nullable=True)  # Post publish time
     nostr_published: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # Whether published to nostr
     nostr_event_id: Mapped[str] = mapped_column(String(64), nullable=True)  # nostr event ID
-
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP, nullable=False,
+                                                 default=lambda: datetime.now(timezone.utc))  # sync timestamp
 
 
 class ApiKey(db.Model):
@@ -36,18 +39,18 @@ class ApiKey(db.Model):
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP, nullable=False, default=lambda: datetime.now(timezone.utc))
     expires_at: Mapped[datetime] = mapped_column(TIMESTAMP, nullable=True)
     last_used_at: Mapped[datetime] = mapped_column(TIMESTAMP, nullable=True)
-    
+
     @staticmethod
     def generate_credentials() -> tuple[str, str]:
         # generate api key and secret
         return token_urlsafe(32), token_urlsafe(32)
-    
+
     def is_valid(self) -> bool:
         """Check if the API key is valid"""
         now = datetime.now(timezone.utc)
         return (
-            self.is_active and
-            (self.expires_at is None or self.expires_at > now)
+                self.is_active and
+                (self.expires_at is None or self.expires_at > now)
         )
 
     def verify_hmac(self, signature: str, message: str) -> bool:
@@ -57,5 +60,5 @@ class ApiKey(db.Model):
             message.encode(),
             hashlib.sha256
         ).hexdigest()
-        
+
         return hmac.compare_digest(signature, expected)

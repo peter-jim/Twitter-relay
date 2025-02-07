@@ -310,6 +310,8 @@ class DataCollector:
 
             for data in resp.get("data", []):
                 uid = data["author_id"]
+                if user_data[uid]["username"] == self.media_account:
+                    continue
                 interaction = {
                     "media_account": self.media_account,
                     "user_id": uid,
@@ -427,6 +429,14 @@ class DataCollector:
         if quotes:
             interactions.extend(quotes)
 
+        mentions = self.get_mention_interactions()
+        if mentions:
+            filtered_mentions = [
+                mention for mention in mentions
+                if mention.get("username") == username
+            ]
+            interactions.extend(filtered_mentions)
+
         return interactions
 
     def get_interactions(self):
@@ -441,7 +451,6 @@ class DataCollector:
             retweets = self._get_interaction_data(self.get_retweet_interactions, tweet)
             replies = self._get_interaction_data(self.get_reply_interactions, tweet)
 
-            # all_interactions.extend(likes + quotes + replies + retweets)
             all_interactions.extend(quotes + replies + retweets)
 
         mentions = self._get_interaction_data(self.get_mention_interactions)
@@ -529,13 +538,13 @@ class NostrPublisher:
             ["user_id", interaction_data.user_id],
             ["username", interaction_data.username],
             ["created_at", interaction_data.interaction_time.isoformat()],
-            ["post_id", interaction_data.post_id],
+            ["post_id", interaction_data.post_id if interaction_data.post_id else ""],
             # ["e", ""]
         ]
 
     @staticmethod
     def _get_kind(interaction_data: Interaction):
-        if interaction_data.interaction_type == "reply" or interaction_data.interaction_type == "quote":
+        if interaction_data.interaction_type == "reply" or interaction_data.interaction_type == "quote" or interaction_data.interaction_type == "mention":
             return 1
         elif interaction_data.interaction_type == "retweet":
             return 6

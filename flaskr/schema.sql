@@ -9,10 +9,11 @@ CREATE TABLE x_interactions
     interaction_type    VARCHAR(20)  NOT NULL,
     interaction_content TEXT,
     interaction_time    TIMESTAMP    NOT NULL,
-    post_id             VARCHAR(64), --nullable
-    post_time           TIMESTAMP,   --nullable
+    post_id             VARCHAR(64),
+    post_time           TIMESTAMP,
     nostr_published     BOOLEAN      NOT NULL DEFAULT FALSE,
     nostr_event_id      VARCHAR(64),
+    created_at          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX               idx_media_account (media_account),
     INDEX               idx_user_id (user_id)
 );

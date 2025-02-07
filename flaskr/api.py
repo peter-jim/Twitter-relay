@@ -103,7 +103,8 @@ def get_interaction_count(user_id: str):
         interaction_summary = {
             "reply": 0,
             "quote": 0,
-            "retweet": 0
+            "retweet": 0,
+            "mention": 0
         }
 
         for row in result.fetchall():
@@ -115,6 +116,8 @@ def get_interaction_count(user_id: str):
                 interaction_summary["quote"] = count
             elif interaction_type == "retweet":
                 interaction_summary["retweet"] = count
+            elif  interaction_type == "mention":
+                interaction_summary["mention"] = count
 
         total_interactions = sum(interaction_summary.values())
     except Exception as e:
