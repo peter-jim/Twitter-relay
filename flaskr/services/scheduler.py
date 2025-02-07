@@ -1,3 +1,4 @@
+import pprint
 import time
 import uuid
 from apscheduler.triggers.interval import IntervalTrigger
@@ -123,7 +124,7 @@ class DataCollector:
                         "avatar_url": data.profile_image_url,
                         "interaction_type": "likes",
                         "interaction_content": "",
-                        "interaction_time": tweet_at, 
+                        "interaction_time": tweet_at,
                         "post_id": tweet_id,
                         "post_time": tweet_at,
                     })
@@ -134,7 +135,7 @@ class DataCollector:
                     #     "avatar_url": data.profile_image_url,
                     #     "interaction_type": "likes",
                     #     "interaction_content": "",
-                    #     "interaction_time": tweet_at,  
+                    #     "interaction_time": tweet_at,
                     #     "post_id": tweet_id,
                     #     "post_time": tweet_at,
                     # })
@@ -229,7 +230,7 @@ class DataCollector:
                     # "avatar_url": data["profile_image_url"],
                     "interaction_id": data["id"],
                     "interaction_type": "retweet",
-                    "interaction_content": data["text"], 
+                    "interaction_content": data["text"],
                     "interaction_time": datetime_as_db_format(data["created_at"]),
                     "post_id": tweet_id,
                     "post_time": tweet_at,
@@ -283,6 +284,44 @@ class DataCollector:
                 # logger.info("interaction:{}", interaction)
 
         return reply_interactions
+
+    def get_mention_interactions(self):
+        mention_interactions = []
+        query = f"@{self.media_account} -is:retweet -is:reply"
+        for resp in tweepy.Paginator(
+                self.client.search_recent_tweets,
+                query=query,
+                tweet_fields=["created_at", "author_id"],
+                expansions=["author_id"],
+                max_results=DataCollector.MAX_RESULTS,
+                user_fields=['profile_image_url'],
+        ):
+            if resp.get("errors"):
+                raise ValueError("mentions not found")
+
+            includes = resp.get("includes", None)
+            if not includes:
+                raise ValueError("mentions user data not found")
+
+            user_data = {}
+            for user in includes.get("users", []):
+                uid = user["id"]
+                user_data[uid] = user
+
+            for data in resp.get("data", []):
+                uid = data["author_id"]
+                interaction = {
+                    "media_account": self.media_account,
+                    "user_id": uid,
+                    "interaction_type": "mention",
+                    "interaction_id": data["id"],
+                    "interaction_content": data["text"],
+                    "interaction_time": datetime_as_db_format(data["created_at"]),
+                    "username": user_data[uid]["username"],
+                    "avatar_url": user_data[uid]["profile_image_url"],
+                }
+                mention_interactions.append(interaction)
+        return mention_interactions
 
     def get_user_recent_quotes(self, username: str):
         query_quote = f"from:{username} is:quote"
@@ -378,7 +417,17 @@ class DataCollector:
             return interactions
 
     def get_user_recent_interactions(self, username: str):
-        return self.get_user_recent_replies_and_retweets(username) + self.get_user_recent_quotes(username)
+        interactions = []
+        replies_and_retweets = self.get_user_recent_replies_and_retweets(username)
+        if replies_and_retweets:
+            interactions.extend(replies_and_retweets)
+
+        quotes = self.get_user_recent_quotes(username)
+
+        if quotes:
+            interactions.extend(quotes)
+
+        return interactions
 
     def get_interactions(self):
         uid = self.get_user_id()
@@ -394,6 +443,9 @@ class DataCollector:
 
             # all_interactions.extend(likes + quotes + replies + retweets)
             all_interactions.extend(quotes + replies + retweets)
+
+        mentions = self._get_interaction_data(self.get_mention_interactions)
+        all_interactions.extend(mentions)
 
         current_app.logger.info(f"before dep: {len(all_interactions)}")
         # unique_interactions = list(set(all_interactions))
@@ -644,10 +696,14 @@ def remove_xsync_task(media_account: str):
 
 
 if __name__ == '__main__':
-    client = tweepy.Client(BEARER_TOKEN, API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_SECRET, return_type=dict)
     from run import app
 
     with app.app_context():
-        dc = DataCollector(client, "hetu_protocol", datetime.now(tz=timezone.utc))
-        interactions = dc.get_user_recent_replies_and_retweets("Sky201805")
-        print(interactions)
+        # client = tweepy.Client(BEARER_TOKEN, API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_SECRET, return_type=dict)
+        # dc = DataCollector(client, "hetu_protocol", datetime.now(tz=timezone.utc))
+
+        dc = DataCollector.default("hetu_protocol")
+        interactions = dc.get_mention_interactions()
+        for interaction in interactions:
+            print("\ninteraction:")
+            pprint.pprint(interaction)

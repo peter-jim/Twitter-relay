@@ -5,7 +5,7 @@ from test_utils import make_api_request
 BASE_URL = "http://127.0.0.1:5000"
 
 # Test accounts
-TEST_MEDIA_ACCOUNT = "hetu_protocol"
+TEST_MEDIA_ACCOUNT = "hetu_protocol"  # uid 1754745579618418688
 TEST_USERNAME = "Sky201805"
 TEST_USER_ID = 993673319512653824
 
@@ -134,7 +134,6 @@ def test_api_person():
     url = f"{BASE_URL}/api/person"
     payload = {
         "media_account": TEST_MEDIA_ACCOUNT,
-        "username": TEST_USERNAME,
     }
     response = make_api_request('POST', url, NORMAL_API_KEY, NORMAL_API_SECRET, payload)
     print(f"POST {url} -> {response.status_code}")
@@ -198,17 +197,17 @@ if __name__ == "__main__":
     test_get_interactions_with_pagination()
     test_get_interactions_count()
 
-    # # Run tests that require API key
-    # print("\n=== Running tests with API key ===")
-    # test_manage_accounts()
-    # test_manage_accounts_errors()
-    # test_api_person()
-    # test_remove_task()
-    #
-    # # Run tests for missing API key
-    # print("\n=== Running tests for missing API key ===")
-    # test_without_required_api_key()
-    #
-    # # Run tests for invalid API key
-    # print("\n=== Running tests with invalid API key ===")
-    # test_with_invalid_api_key()
+    # Run tests that require API key
+    print("\n=== Running tests with API key ===")
+    test_manage_accounts()
+    test_manage_accounts_errors()
+    test_api_person()
+    test_remove_task()
+
+    # Run tests for missing API key
+    print("\n=== Running tests for missing API key ===")
+    test_without_required_api_key()
+
+    # Run tests for invalid API key
+    print("\n=== Running tests with invalid API key ===")
+    test_with_invalid_api_key()

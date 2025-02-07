@@ -1,5 +1,7 @@
 from datetime import datetime
 from functools import partial, wraps
+from idlelib.rpc import request_queue
+
 from flask import request, current_app
 from .models import ApiKey
 from datetime import datetime, timezone
@@ -98,9 +100,9 @@ def require_api_key(f=None, *, admin_required=False):
             
             # construct message for hmac verification
             message = f"{request.method}{request.path}{timestamp}"
-            if request.data:
-                message += request.data.decode('utf-8')
-            
+            if request.is_json:
+                message += request.get_data(as_text=True) or "{}"
+
             # check hmac signature
             if not key.verify_hmac(signature, message):
                 return {

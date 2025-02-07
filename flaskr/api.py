@@ -132,7 +132,13 @@ def get_interaction_count(user_id: str):
 @require_api_key
 def manage_accounts():
     req = request.json
-    media_account = req["media_account"]
+    if not req:
+        return response_bad_request("Request body is required")
+
+    try:
+        media_account = req["media_account"]
+    except  KeyError:
+        return response_bad_request("media_account field is required")
 
     if request.method == "DELETE":
         try:
@@ -188,8 +194,18 @@ def manage_accounts():
 @require_api_key
 def manage_person():
     req = request.json
-    media_account = req["media_account"]
-    username = req["username"]
+    current_app.logger.debug(f"req: {req}")
+    if not req:
+        current_app.logger.error("no request body")
+        return response_bad_request("Request body is required")
+
+    try:
+        media_account = req["media_account"]
+        username = req["username"]
+    except  KeyError as e:
+        current_app.logger.error(f"Failed to get media account or username: {str(e)}")
+        return response_bad_request("media_account and username field is required")
+
     try:
         dc = DataCollector.default(media_account)
         interactions_data = dc.get_user_recent_interactions(username)
