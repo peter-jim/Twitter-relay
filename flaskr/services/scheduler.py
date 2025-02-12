@@ -155,7 +155,6 @@ class DataCollector:
                 max_results=DataCollector.MAX_RESULTS,
                 id=tweet_id,
                 exclude=["retweets"],
-                user_auth=True,
                 tweet_fields=['created_at'],
                 expansions=["author_id"],
                 user_fields=['profile_image_url'],
@@ -252,7 +251,7 @@ class DataCollector:
         reply_interactions = []
         query = f"conversation_id:{tweet_id} is:reply"
         for resp in tweepy.Paginator(
-                self.client.search_all_tweets,
+                self.client.search_recent_tweets,
                 query=query,
                 tweet_fields=["created_at"],
                 max_results=DataCollector.MAX_RESULTS,

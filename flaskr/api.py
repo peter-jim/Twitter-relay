@@ -10,6 +10,38 @@ from .utils import require_api_key, validate_update_frequency, response_media_no
 
 bp = Blueprint('api', __name__, url_prefix="/api")
 
+@bp.route("/ping", methods=['GET'])
+def ping():
+    """Simple ping endpoint to verify API is responsive"""
+    return {"status": "success", "message": "pong"}
+
+
+@bp.route("/health", methods=['GET'])
+def health():
+    """Health check endpoint that verifies critical system components"""
+    health_status = {
+        "status": "healthy",
+        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+        "components": {
+            "database": "healthy",
+            "api": "healthy"
+        }
+    }
+
+    # Check database connection
+    try:
+        # Perform a simple database query
+        db.session.execute(select(1)).scalar()
+    except Exception as e:
+        current_app.logger.error(f"Database health check failed: {str(e)}")
+        health_status["status"] = "unhealthy"
+        health_status["components"]["database"] = "unhealthy"
+
+    # Return 200 if healthy, 503 if unhealthy
+    status_code = 200 if health_status["status"] == "healthy" else 503
+
+    return health_status, status_code
+
 
 @bp.route("/interaction/<media_account>", methods=['GET'])
 def get_interactions(media_account: str):

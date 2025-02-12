@@ -57,7 +57,7 @@ def test_manage_accounts():
     url = f"{BASE_URL}/api/accounts"
     payload = {
         "media_account": TEST_MEDIA_ACCOUNT,
-        "start_time": "2025-02-05T00:00:00Z",
+        "start_time": "2025-02-12T00:00:00Z",
         "update_frequency": "1 week",
     }
     response = make_api_request('POST', url, NORMAL_API_KEY, NORMAL_API_SECRET, payload)
