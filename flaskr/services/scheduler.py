@@ -8,6 +8,7 @@ from datetime import datetime, timezone, timedelta
 import dotenv
 from coincurve.utils import sha256
 from loguru import logger
+from sqlalchemy import select
 import tweepy
 from sqlalchemy.exc import IntegrityError
 from flaskr.models import Interaction
@@ -607,8 +608,17 @@ def fetch_and_store_xdata(media_account, from_dt: datetime):
         dc = DataCollector(client, media_account, from_dt)
         interactions_data = dc.get_interactions()
 
+
+
         for interaction_data in interactions_data:
             interaction = Interaction(**interaction_data)
+
+            # interaction exist
+            if db.session.execute(select(Interaction).where(Interaction.interaction_id == interaction.interaction_id)).scalar_one_or_none():
+                current_app.logger.info(f"Interaction {interaction.interaction_id} already exists in database")
+                continue
+
+            # otherwise
             try:
                 # Publish to nostr
                 success, message, event_id = nostr_publisher.publish(interaction)
