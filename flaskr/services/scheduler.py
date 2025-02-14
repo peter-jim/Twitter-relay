@@ -103,6 +103,7 @@ class DataCollector:
 
         return tweets
 
+    # unavailable api
     def get_like_interactions(self, tweet):
         # Can't get the time point of likes
         likes_interactions = []
@@ -264,6 +265,9 @@ class DataCollector:
             if resp.get("errors"):
                 raise ValueError("retweets not found")
 
+            if not resp.get("meta", {}).get("result_count", 0):
+                return []
+
             for data in resp.get("data", []):
                 interaction = {
                     "media_account": self.media_account,
@@ -299,7 +303,10 @@ class DataCollector:
             if resp.get("errors"):
                 raise ValueError("mentions not found")
 
-            includes = resp.get("includes", None)
+            if not resp.get("meta", {}).get("result_count", 0):
+                return []
+
+            includes = resp.get("includes")
             if not includes:
                 raise ValueError("mentions user data not found")
 
@@ -340,10 +347,12 @@ class DataCollector:
             if resp.get("errors"):
                 raise ValueError("user's interactions not found")
 
-            if not resp.get("includes", None):
-                raise ValueError("includes fields not found")
+            if not resp.get("meta", {}).get("result_count", 0):
+                return []
 
-            includes: dict = resp.get("includes")
+            includes: dict|None = resp.get("includes")
+            if not includes:
+                raise ValueError("includes fields not found")
 
             author_id = ""
             avatar_url = ""
@@ -391,6 +400,9 @@ class DataCollector:
             # logger.info(f"resp: {resp}")
             if resp.get("errors"):
                 raise ValueError("user's interactions not found")
+
+            if not resp.get("meta", {}).get("result_count", 0):
+                return []
 
             for data in resp.get("data", []):
                 avatar_url = ""
