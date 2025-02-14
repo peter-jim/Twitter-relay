@@ -1,7 +1,4 @@
-from datetime import datetime
 from functools import partial, wraps
-from idlelib.rpc import request_queue
-
 from flask import request, current_app
 from .models import ApiKey
 from datetime import datetime, timezone

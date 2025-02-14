@@ -289,7 +289,7 @@ class DataCollector:
 
         return reply_interactions
 
-    def get_mention_interactions(self):
+    def get_mention_interactions(self, start_time: str | None = None):
         mention_interactions = []
         query = f"@{self.media_account} -is:retweet -is:reply"
         for resp in tweepy.Paginator(
@@ -299,6 +299,7 @@ class DataCollector:
                 expansions=["author_id"],
                 max_results=DataCollector.MAX_RESULTS,
                 user_fields=['profile_image_url'],
+                start_time=start_time,
         ):
             if resp.get("errors"):
                 raise ValueError("mentions not found")
@@ -332,7 +333,7 @@ class DataCollector:
                 mention_interactions.append(interaction)
         return mention_interactions
 
-    def get_user_recent_quotes(self, username: str):
+    def get_user_recent_quotes(self, username: str, start_time: str | None = None):
         query_quote = f"from:{username} is:quote"
         quote_interactions = []
         for resp in tweepy.Paginator(
@@ -342,6 +343,7 @@ class DataCollector:
                 max_results=DataCollector.MAX_RESULTS,
                 expansions=["referenced_tweets.id.author_id"],
                 user_fields=['profile_image_url'],
+                start_time=start_time,
         ):
             # logger.info(f"resp: {resp}")
             if resp.get("errors"):
@@ -350,7 +352,7 @@ class DataCollector:
             if not resp.get("meta", {}).get("result_count", 0):
                 return []
 
-            includes: dict|None = resp.get("includes")
+            includes: dict | None = resp.get("includes")
             if not includes:
                 raise ValueError("includes fields not found")
 
@@ -375,6 +377,7 @@ class DataCollector:
                         "avatar_url": avatar_url,
                         "media_account": self.media_account,
                         "user_id": data["author_id"],
+                        "username": username,
                         "interaction_type": "quote",
                         "interaction_id": data["id"],
                         "interaction_content": data["text"],
@@ -386,7 +389,7 @@ class DataCollector:
 
         return quote_interactions
 
-    def get_user_recent_replies_and_retweets(self, username: str):
+    def get_user_recent_replies_and_retweets(self, username: str, start_time: str | None = None):
         query_reply_or_retweet = f"from:{username} @{self.media_account}"
         interactions = []
         for resp in tweepy.Paginator(
@@ -396,6 +399,7 @@ class DataCollector:
                 expansions=["referenced_tweets.id.author_id"],
                 user_fields=['profile_image_url'],
                 max_results=DataCollector.MAX_RESULTS,
+                start_time=start_time,
         ):
             # logger.info(f"resp: {resp}")
             if resp.get("errors"):
@@ -420,6 +424,7 @@ class DataCollector:
                             "avatar_url": avatar_url,
                             "media_account": self.media_account,
                             "user_id": data["author_id"],
+                            "username": username,
                             "interaction_type": interaction_type,
                             "interaction_id": data["id"],
                             "interaction_content": data["text"],
@@ -430,18 +435,18 @@ class DataCollector:
                         interactions.append(interaction)
             return interactions
 
-    def get_user_recent_interactions(self, username: str):
+    def get_user_recent_interactions(self, username: str, start_time: str | None = None):
         interactions = []
-        replies_and_retweets = self.get_user_recent_replies_and_retweets(username)
+        replies_and_retweets = self.get_user_recent_replies_and_retweets(username, start_time)
         if replies_and_retweets:
             interactions.extend(replies_and_retweets)
 
-        quotes = self.get_user_recent_quotes(username)
+        quotes = self.get_user_recent_quotes(username, start_time)
 
         if quotes:
             interactions.extend(quotes)
 
-        mentions = self.get_mention_interactions()
+        mentions = self.get_mention_interactions(start_time)
         if mentions:
             filtered_mentions = [
                 mention for mention in mentions
@@ -620,13 +625,12 @@ def fetch_and_store_xdata(media_account, from_dt: datetime):
         dc = DataCollector(client, media_account, from_dt)
         interactions_data = dc.get_interactions()
 
-
-
         for interaction_data in interactions_data:
             interaction = Interaction(**interaction_data)
 
             # interaction exist
-            if db.session.execute(select(Interaction).where(Interaction.interaction_id == interaction.interaction_id)).scalar_one_or_none():
+            if db.session.execute(select(Interaction).where(
+                    Interaction.interaction_id == interaction.interaction_id)).scalar_one_or_none():
                 current_app.logger.info(f"Interaction {interaction.interaction_id} already exists in database")
                 continue
 

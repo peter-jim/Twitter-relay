@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from flask import request, Blueprint, current_app
 from sqlalchemy import  func
+from sqlalchemy.pool.impl import exc
 from .extensions import db
 from sqlalchemy.sql.expression import select
 from .models import Interaction
@@ -190,13 +191,15 @@ def manage_accounts():
     update_frequency = req["update_frequency"]
     # Validate start_time and update_frequency
     try:
+        if not start_time.endswith("Z"):
+            return response_bad_request("Invalid start time format, require YYYY-MM-DDTHH:mm:ssZ format")
         start_dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
         # Ensure it's UTC
         if start_dt.tzinfo != timezone.utc:
             start_dt = start_dt.replace(tzinfo=timezone.utc)
     except ValueError as e:
         current_app.logger.error(f"Invalid start time: {start_time}: {str(e)}")
-        return response_bad_request("Invalid start time format, require ISO 8601 format")
+        return response_bad_request("Invalid start time format, require YYYY-MM-DDTHH:mm:ssZ format")
 
     if start_dt >= datetime.now(tz=timezone.utc):
         current_app.logger.error(f"Invalid start time: {start_time}")
@@ -237,13 +240,23 @@ def manage_person():
     try:
         media_account = req["media_account"]
         username = req["username"]
+        start_time = req.get("start_time")
+        if start_time:
+            try:
+                datetime.fromisoformat(start_time)
+            except ValueError:
+                return response_bad_request("Invalid start time format, require YYYY-MM-DDTHH:mm:ssZ format")
+
+            if not start_time.endswith("Z"):
+                return response_bad_request("Invalid start time format, require YYYY-MM-DDTHH:mm:ssZ format")
+
     except  KeyError as e:
         current_app.logger.error(f"Failed to get media account or username: {str(e)}")
         return response_bad_request("media_account and username field is required")
 
     try:
         dc = DataCollector.default(media_account)
-        interactions_data = dc.get_user_recent_interactions(username)
+        interactions_data = dc.get_user_recent_interactions(username, start_time)
 
 
     except Exception as e:

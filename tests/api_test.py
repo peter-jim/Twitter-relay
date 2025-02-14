@@ -134,6 +134,8 @@ def test_api_person():
     url = f"{BASE_URL}/api/person"
     payload = {
         "media_account": TEST_MEDIA_ACCOUNT,
+        "username": "d5c5ceb0",
+        "start_time": "2025-02-13T01:59:03",
     }
     response = make_api_request('POST', url, NORMAL_API_KEY, NORMAL_API_SECRET, payload)
     print(f"POST {url} -> {response.status_code}")
@@ -190,24 +192,25 @@ def test_with_invalid_api_key():
 
 
 if __name__ == "__main__":
-    # Run tests that don't require API key
-    print("\n=== Running tests without API key ===")
-    test_get_interactions()
-    test_get_interactions_with_username()
-    test_get_interactions_with_pagination()
-    test_get_interactions_count()
-
-    # Run tests that require API key
-    print("\n=== Running tests with API key ===")
-    test_manage_accounts()
-    test_manage_accounts_errors()
+    # # Run tests that don't require API key
+    # print("\n=== Running tests without API key ===")
+    # test_get_interactions()
+    # test_get_interactions_with_username()
+    # test_get_interactions_with_pagination()
+    # test_get_interactions_count()
+    #
+    # # Run tests that require API key
+    # print("\n=== Running tests with API key ===")
+    # test_manage_accounts()
+    # test_manage_accounts_errors()
+    # test_api_person()
+    # test_remove_task()
+    #
+    # # Run tests for missing API key
+    # print("\n=== Running tests for missing API key ===")
+    # test_without_required_api_key()
+    #
+    # # Run tests for invalid API key
+    # print("\n=== Running tests with invalid API key ===")
+    # test_with_invalid_api_key()
     test_api_person()
-    test_remove_task()
-
-    # Run tests for missing API key
-    print("\n=== Running tests for missing API key ===")
-    test_without_required_api_key()
-
-    # Run tests for invalid API key
-    print("\n=== Running tests with invalid API key ===")
-    test_with_invalid_api_key()
