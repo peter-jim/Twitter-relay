@@ -347,7 +347,7 @@ class DataCollector:
         ):
             # logger.info(f"resp: {resp}")
             if resp.get("errors"):
-                raise ValueError("user's interactions not found")
+                raise ValueError("failed to get user recent quotes")
 
             if not resp.get("meta", {}).get("result_count", 0):
                 return []
@@ -402,8 +402,8 @@ class DataCollector:
                 start_time=start_time,
         ):
             # logger.info(f"resp: {resp}")
-            if resp.get("errors"):
-                raise ValueError("user's interactions not found")
+            # if resp.get("errors"):
+            #     raise ValueError("failed to get user recent replies and retweets")
 
             if not resp.get("meta", {}).get("result_count", 0):
                 return []
@@ -737,7 +737,7 @@ if __name__ == '__main__':
         # dc = DataCollector(client, "hetu_protocol", datetime.now(tz=timezone.utc))
 
         dc = DataCollector.default("hetu_protocol")
-        interactions = dc.get_mention_interactions()
+        interactions = dc.get_user_recent_replies_and_retweets("d5c5ceb0", "2025-02-13T01:59:03Z")
         for interaction in interactions:
             print("\ninteraction:")
             pprint.pprint(interaction)

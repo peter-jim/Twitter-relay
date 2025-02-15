@@ -135,7 +135,7 @@ def test_api_person():
     payload = {
         "media_account": TEST_MEDIA_ACCOUNT,
         "username": "d5c5ceb0",
-        "start_time": "2025-02-13T01:59:03",
+        "start_time": "2025-02-15T00:00:00Z",
     }
     response = make_api_request('POST', url, NORMAL_API_KEY, NORMAL_API_SECRET, payload)
     print(f"POST {url} -> {response.status_code}")
