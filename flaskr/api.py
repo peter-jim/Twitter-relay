@@ -218,7 +218,7 @@ def manage_accounts():
             # Try to get some data to verify the account exists and is accessible
             dc.validate_media_account()
 
-            add_xsync_task(media_account, frequency_unit, frequency_value)
+            add_xsync_task(media_account, frequency_unit, frequency_value, start_dt)
             add_xsync_once_task(media_account, start_dt)  # Add a one-time initialization task to execute immediately
         except Exception as e:
             return response_media_not_found(str(e))

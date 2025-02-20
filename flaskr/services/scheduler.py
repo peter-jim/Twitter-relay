@@ -678,7 +678,7 @@ def fetch_and_store_xdata_with_context(media_account, from_dt: datetime):
         fetch_and_store_xdata(media_account, from_dt)
 
 
-def add_xsync_task(media_account: str, frequency_unit: str, frequency_value: int):
+def add_xsync_task(media_account: str, frequency_unit: str, frequency_value: int, from_dt: datetime):
     now = datetime.now(tz=timezone.utc)
     if frequency_unit in ['second', 'seconds']:
         interval_params = {'seconds': frequency_value}
@@ -704,7 +704,7 @@ def add_xsync_task(media_account: str, frequency_unit: str, frequency_value: int
         trigger=IntervalTrigger(**interval_params),  # Set interval trigger
         next_run_time=next_run_time,  # First execution time
         id=f"task_{media_account}",  # Set task's unique ID
-        args=[media_account, now],  # Pass parameters to fetch_xdata function
+        args=[media_account, from_dt],  # Pass parameters to fetch_xdata function
         replace_existing=True,  # If the task ID already exists, replace it
         misfire_grace_time=None
     )
