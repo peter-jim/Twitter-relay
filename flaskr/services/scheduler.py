@@ -4,7 +4,7 @@ import uuid
 from apscheduler.triggers.interval import IntervalTrigger
 import os
 import pathlib
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timezone, timedelta
 import dotenv
 from coincurve.utils import sha256
 from loguru import logger
@@ -26,12 +26,14 @@ BEARER_TOKEN = os.getenv("BEARER_TOKEN")
 class DataCollector:
     MAX_RESULTS = 100
 
-    def __init__(self, client: tweepy.Client, media_account: str, from_date: datetime = None):
+    def __init__(self, client: tweepy.Client, media_account: str, from_date: datetime | None = None,
+                 prev_sync_time: datetime | None = None):
         self.client = client
         self.media_account = media_account
         self.interactions = []
         self.start_time = from_date
         self.end_time = datetime.now(tz=timezone.utc)
+        self.prev_sync_time = prev_sync_time
         # Check if it's utc time
         if from_date:
             if not isinstance(from_date, datetime):
@@ -41,6 +43,7 @@ class DataCollector:
             self.start_time_as_param = from_date.strftime('%Y-%m-%dT%H:%M:%SZ')
         else:
             self.start_time = datetime.now(tz=timezone.utc) - timedelta(weeks=1)
+            self.start_time_as_param = self.start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
 
     @classmethod
     def default(cls, media_account: str):
@@ -161,7 +164,7 @@ class DataCollector:
                 expansions=["author_id"],
                 user_fields=['profile_image_url'],
         ):
-            # logger.info(f"resp:{resp}")
+            logger.warning(f"resp:{resp}")
             if resp.get("errors"):
                 logger.error(
                     "Failed to get quote interaction from {} to {}",
@@ -170,6 +173,7 @@ class DataCollector:
                 )
                 continue
 
+            stop_flag = False
             for data in resp.get("data", []):
                 interaction = {
                     "media_account": self.media_account,
@@ -188,8 +192,13 @@ class DataCollector:
                     if users["id"] == data["author_id"]:
                         interaction["username"] = users["username"]
                         interaction["avatar_url"] = users["profile_image_url"]
+                if self.prev_sync_time and datetime.fromisoformat(data["created_at"]) < self.prev_sync_time:
+                    stop_flag = True
+                    break
                 quote_interactions.append(interaction)
 
+            if stop_flag:
+                break
         return quote_interactions
 
     # Rate limit: 50 requests / 15 mins PER USER
@@ -223,6 +232,7 @@ class DataCollector:
                 break
             querystring["pagination_token"] = meta["next_token"]
 
+            stop_flag = False
             for data in resp_data.get("data", []):
                 interaction = {
                     "media_account": self.media_account,
@@ -242,7 +252,13 @@ class DataCollector:
                         interaction["username"] = users["username"]
                         interaction["avatar_url"] = users["profile_image_url"]
 
+                if self.prev_sync_time and datetime.fromisoformat(data["created_at"]) < self.prev_sync_time:
+                    stop_flag = True
+                    break
                 retweets_interactions.append(interaction)
+
+            if stop_flag:
+                break
 
         return retweets_interactions
 
@@ -268,6 +284,7 @@ class DataCollector:
             if not resp.get("meta", {}).get("result_count", 0):
                 return []
 
+            stop_flag = False
             for data in resp.get("data", []):
                 interaction = {
                     "media_account": self.media_account,
@@ -284,7 +301,13 @@ class DataCollector:
                     if users["id"] == data["author_id"]:
                         interaction["username"] = users["username"]
                         interaction["avatar_url"] = users["profile_image_url"]
+                if self.prev_sync_time and datetime.fromisoformat(data["created_at"]) < self.prev_sync_time:
+                    stop_flag = True
+                    break
                 reply_interactions.append(interaction)
+
+            if stop_flag:
+                break
                 # logger.info("interaction:{}", interaction)
 
         return reply_interactions
@@ -316,6 +339,7 @@ class DataCollector:
                 uid = user["id"]
                 user_data[uid] = user
 
+            stop_flag = False
             for data in resp.get("data", []):
                 uid = data["author_id"]
                 if user_data[uid]["username"] == self.media_account:
@@ -330,7 +354,14 @@ class DataCollector:
                     "username": user_data[uid]["username"],
                     "avatar_url": user_data[uid]["profile_image_url"],
                 }
+                if self.prev_sync_time and datetime.fromisoformat(data["created_at"]) < self.prev_sync_time:
+                    stop_flag = True
+                    break
                 mention_interactions.append(interaction)
+
+            if stop_flag:
+                break
+
         return mention_interactions
 
     def get_user_recent_quotes(self, username: str, start_time: str | None = None):
@@ -370,6 +401,7 @@ class DataCollector:
                     tweet_id = tweet["id"]
                     tweet_ids_with_ts[tweet_id] = tweet["created_at"]
 
+            stop_flag = False
             for data in resp.get("data", []):
                 post_id = data["referenced_tweets"][0]["id"]
                 if post_id in tweet_ids_with_ts.keys():
@@ -385,7 +417,13 @@ class DataCollector:
                         "post_id": post_id,
                         "post_time": datetime_as_db_format(tweet_ids_with_ts[post_id]),
                     }
+                    if self.prev_sync_time and datetime.fromisoformat(data["created_at"]) < self.prev_sync_time:
+                        stop_flag = True
+                        break
                     quote_interactions.append(interaction)
+
+            if stop_flag:
+                break
 
         return quote_interactions
 
@@ -408,6 +446,7 @@ class DataCollector:
             if not resp.get("meta", {}).get("result_count", 0):
                 return []
 
+            stop_flag = False
             for data in resp.get("data", []):
                 avatar_url = ""
                 for user in resp["includes"]["users"]:
@@ -418,6 +457,7 @@ class DataCollector:
                 interaction_type = "retweet" if content.startswith("RT") else "reply"
 
                 post_id = data["referenced_tweets"][0]["id"]
+                interaction_time = datetime.now(tz=UTC)
                 for tweet in resp["includes"]["tweets"]:
                     if tweet["id"] == post_id:
                         interaction = {
@@ -432,7 +472,16 @@ class DataCollector:
                             "post_id": post_id,
                             "post_time": datetime_as_db_format(tweet["created_at"]),
                         }
+                        interaction_time = datetime.fromisoformat(data["created_at"])
                         interactions.append(interaction)
+
+                if self.prev_sync_time and interaction_time < self.prev_sync_time:
+                    stop_flag = True
+                    break
+
+            if stop_flag:
+                break
+
             return interactions
 
     def get_user_recent_interactions(self, username: str, start_time: str | None = None):
@@ -614,7 +663,12 @@ class NostrPublisher:
             return False, f"Error occurred: {str(e)}", ""
 
 
-def fetch_and_store_xdata(media_account, from_dt: datetime):
+def fetch_and_store_xdata(media_account, from_dt: datetime, td: timedelta):
+    now = datetime.now(tz=UTC)
+    prev_sync_time = now - td
+    if prev_sync_time >= now:
+        raise ValueError("Invalid time interval")
+
     current_app.logger.info(
         f"Start fetching xdata from {from_dt} to {datetime.now(tz=timezone.utc)} for {media_account}")
 
@@ -622,7 +676,7 @@ def fetch_and_store_xdata(media_account, from_dt: datetime):
 
     nostr_publisher = NostrPublisher()
     try:
-        dc = DataCollector(client, media_account, from_dt)
+        dc = DataCollector(client, media_account, from_dt, prev_sync_time)
         interactions_data = dc.get_interactions()
 
         for interaction_data in interactions_data:
@@ -673,28 +727,33 @@ def fetch_and_store_xdata(media_account, from_dt: datetime):
     current_app.logger.info("Completed fetching and processing data")
 
 
-def fetch_and_store_xdata_with_context(media_account, from_dt: datetime):
+def fetch_and_store_xdata_with_context(media_account, from_dt: datetime, td: timedelta | None = None):
     with scheduler.app.app_context():  # Manually create context
-        fetch_and_store_xdata(media_account, from_dt)
+        fetch_and_store_xdata(media_account, from_dt, td)
 
 
 def add_xsync_task(media_account: str, frequency_unit: str, frequency_value: int, from_dt: datetime):
     now = datetime.now(tz=timezone.utc)
     if frequency_unit in ['second', 'seconds']:
         interval_params = {'seconds': frequency_value}
-        next_run_time = now + timedelta(seconds=frequency_value)
+        td = timedelta(seconds=frequency_value)
+        next_run_time = now + td
     elif frequency_unit in ['minute', 'minutes']:
         interval_params = {'minutes': frequency_value}
-        next_run_time = now + timedelta(minutes=frequency_value)
+        td = timedelta(minutes=frequency_value)
+        next_run_time = now + td
     elif frequency_unit in ['hour', 'hours']:
         interval_params = {'hours': frequency_value}
-        next_run_time = now + timedelta(hours=frequency_value)
+        td = timedelta(hours=frequency_value)
+        next_run_time = now + td
     elif frequency_unit in ['day', 'days']:
         interval_params = {'days': frequency_value}
-        next_run_time = now + timedelta(days=frequency_value)
+        td = timedelta(days=frequency_value)
+        next_run_time = now + td
     elif frequency_unit in ['week', 'weeks']:
         interval_params = {'weeks': frequency_value}
-        next_run_time = now + timedelta(weeks=frequency_value)
+        td = timedelta(weeks=frequency_value)
+        next_run_time = now + td
     else:
         raise ValueError(f"Unsupported frequency unit: {frequency_unit}")
 
@@ -704,7 +763,7 @@ def add_xsync_task(media_account: str, frequency_unit: str, frequency_value: int
         trigger=IntervalTrigger(**interval_params),  # Set interval trigger
         next_run_time=next_run_time,  # First execution time
         id=f"task_{media_account}",  # Set task's unique ID
-        args=[media_account, from_dt],  # Pass parameters to fetch_xdata function
+        args=[media_account, from_dt, td],  # Pass parameters to fetch_xdata function
         replace_existing=True,  # If the task ID already exists, replace it
         misfire_grace_time=None
     )
@@ -733,11 +792,12 @@ if __name__ == '__main__':
     from run import app
 
     with app.app_context():
-        # client = tweepy.Client(BEARER_TOKEN, API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_SECRET, return_type=dict)
+        client = tweepy.Client(BEARER_TOKEN, API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_SECRET, return_type=dict)
         # dc = DataCollector(client, "hetu_protocol", datetime.now(tz=timezone.utc))
 
-        dc = DataCollector.default("hetu_protocol")
-        interactions = dc.get_user_recent_replies_and_retweets("d5c5ceb0", "2025-02-13T01:59:03Z")
+        dc = DataCollector(client, "hetu_protocol", datetime(2025, 2, 15, tzinfo=UTC),
+                           datetime(2025, 2, 21, tzinfo=UTC))
+        interactions = dc.get_retweet_interactions({"tweet_id": 1890437101206098102, "created_at": ""})
         for interaction in interactions:
             print("\ninteraction:")
             pprint.pprint(interaction)

@@ -57,7 +57,7 @@ def test_manage_accounts():
     url = f"{BASE_URL}/api/accounts"
     payload = {
         "media_account": TEST_MEDIA_ACCOUNT,
-        "start_time": "2025-02-12T00:00:00Z",
+        "start_time": "2025-02-10T00:00:00Z",
         "update_frequency": "1 week",
     }
     response = make_api_request('POST', url, NORMAL_API_KEY, NORMAL_API_SECRET, payload)
@@ -213,4 +213,4 @@ if __name__ == "__main__":
     # # Run tests for invalid API key
     # print("\n=== Running tests with invalid API key ===")
     # test_with_invalid_api_key()
-    test_api_person()
+    test_manage_accounts()
