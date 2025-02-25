@@ -52,6 +52,28 @@ def get_interactions(media_account: str):
         per_page = request.args.get('per_page', 10, type=int)
         username =  request.args.get('username', None)
 
+        start_time = request.args.get("start_time", None)
+        if start_time:
+            try:
+                datetime.fromisoformat(start_time)
+            except ValueError:
+                return response_bad_request("Invalid start time format, require YYYY-MM-DDTHH:mm:ssZ format")
+
+            if not start_time.endswith("Z"):
+                return response_bad_request("Invalid start time format, require YYYY-MM-DDTHH:mm:ssZ format")
+
+        end_time = request.args.get("end_time", None)
+        if end_time:
+            try:
+                datetime.fromisoformat(end_time)
+            except ValueError:
+                return response_bad_request("Invalid start time format, require YYYY-MM-DDTHH:mm:ssZ format")
+
+            if not end_time.endswith("Z"):
+                return response_bad_request("Invalid start time format, require YYYY-MM-DDTHH:mm:ssZ format")
+
+        current_app.logger.error(f"Database health check failed: {start_time}, {end_time}")
+
         # Validate pagination parameters
         if page < 1:
             return response_bad_request("Page number must be greater than 0")
@@ -64,6 +86,11 @@ def get_interactions(media_account: str):
         if username:
             query = query.where(Interaction.username == username)
 
+        if start_time:
+            query = query.where(Interaction.interaction_time >= start_time)
+
+        if end_time:
+            query = query.where(Interaction.interaction_time <= end_time)
 
         result = db.session.execute(
             query
@@ -76,6 +103,12 @@ def get_interactions(media_account: str):
         count_query = select(func.count()).select_from(Interaction).where(Interaction.media_account == media_account)
         if username:
             count_query = count_query.where(Interaction.username == username)
+
+        if start_time:
+            query = query.where(Interaction.interaction_time >= start_time)
+
+        if end_time:
+            query = query.where(Interaction.interaction_time <= end_time)
 
         # Get total count for pagination info
         total_count = db.session.execute(count_query).scalar()
@@ -293,7 +326,7 @@ def manage_person():
                 "interaction_content": interaction.interaction_content,
                 "interaction_time": interaction.interaction_time.isoformat(),  # Convert to ISO format
                 "post_id": interaction.post_id,
-                "post_time": interaction.post_time.isoformat(),
+                "post_time": interaction.post_time.isoformat() if interaction.post_time else None,
             }
             for interaction in merged_interactions
         ]
