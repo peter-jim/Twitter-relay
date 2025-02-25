@@ -470,8 +470,8 @@ class DataCollector:
 
             all_interactions.extend(quotes + replies + retweets)
 
-        mentions = self._get_interaction_data(self.get_mention_interactions)
-        all_interactions.extend(mentions)
+        #mentions = self._get_interaction_data(self.get_mention_interactions)
+        #all_interactions.extend(mentions)
 
         current_app.logger.info(f"before dep: {len(all_interactions)}")
         # unique_interactions = list(set(all_interactions))
